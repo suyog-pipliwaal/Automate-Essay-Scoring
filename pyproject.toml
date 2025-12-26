@@ -1,0 +1,32 @@
+[project]
+name = "automate-essay-scoring"
+version = "0.1.0"
+description = "kaggle competetion Automated Essay Scoring 2.0"
+authors = [
+    {name = "Suyog Pipliwal",email = "suyogpipliwal@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas (>=2.3.3,<3.0.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
+    "pydantic (>=2.12.5,<3.0.0)",
+    "scikit-learn (>=1.8.0,<2.0.0)",
+    "nltk (>=3.9.2,<4.0.0)",
+    "numpy (>=2.4.0,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "black (>=25.12.0,<26.0.0)",
+    "isort (>=7.0.0,<8.0.0)",
+    "ruff (>=0.14.10,<0.15.0)",
+    "pytest (>=9.0.2,<10.0.0)",
+    "jupyter (>=1.1.1,<2.0.0)",
+    "ipykernel (>=7.1.0,<8.0.0)"
+]
