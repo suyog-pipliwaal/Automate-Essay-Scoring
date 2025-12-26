@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import joblib
 from sklearn.feature_extraction import  text
-from src.data.load_data import load_train
+from src.data.load_data import load_train, load_test
 from src.utils.timeit import timeit
 from src.utils.contractions import contractions
 from sklearn.model_selection import train_test_split
@@ -65,6 +65,7 @@ def to_vectors(dataset:pd.DataFrame):
   print(f"{len(dataset.score)} documents ")
   print(f"n_samples in training: {X_train.shape[0]}, n_features: {X_train.shape[1]}")
   print(f"n_samples in testing: {X_test.shape[0]}, n_features: {X_test.shape[1]}")
+  save_model(vectorizer, model_name="vectorize")
   
   return X_train, y_train, X_test, y_test, feature_name, vectorizer
   
@@ -83,9 +84,30 @@ def regression(traning_model, X_train, y_train, X_test, y_test):
 def save_model(model, model_name, path="src/models/exp_1_baseline/"):
   os.makedirs(path, exist_ok=True)
   full_path = os.path.join(path, f"{model_name}.pkl")
-  print(f"saving best model {model_name} at {full_path}")
+  print(f"saving {model_name} at {full_path}")
   print(full_path)
   joblib.dump(model, full_path)
+  
+@timeit
+def inference(model_name, vectorize_path="vectorize", root_dir="src/models/exp_1_baseline/"):
+  os.makedirs("src/submission/exp_1_basline/", exist_ok=True)
+  submission_file_paht = os.path.join("src/submission/exp_1_basline/", "submission.csv")
+  model       = joblib.load(os.path.join(root_dir, f"{model_name}.pkl"))
+  vectorizer  = joblib.load(os.path.join(root_dir,f"{vectorize_path}.pkl"))
+  score = list()
+  test_df = load_test()
+  test_df['clean_input'] = list(map(clean_text, test_df.full_text))
+  X_test = vectorizer.transform(test_df.clean_input.tolist())
+  preds = model.predict(X_test)
+  print(preds)
+    # Clip predictions to valid AES score range
+  preds = np.clip(np.round(preds), 1, 6).astype(int)
+  submission = pd.DataFrame({
+        "essay_id": test_df.essay_id,
+        "score": preds
+    })
+  submission.to_csv(submission_file_paht, index=False)
+    
 if __name__ ==  '__main__':
   train_dataset = load_train()
   dataset = preprocessing(train_dataset)
@@ -115,6 +137,7 @@ if __name__ ==  '__main__':
       best_model = model
       best_name = name
   save_model(best_model,best_name)
+  inference(model_name=best_name)
     
     
     
