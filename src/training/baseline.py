@@ -11,12 +11,12 @@ from src.utils.contractions import contractions
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from src.utils.kappa import quadratic_weighted_kappa
+from src.utils.seed import set_seed
+from src.config.config import config
 from sklearn.svm import SVR
 from sklearn.ensemble import GradientBoostingRegressor
 
 nltk.download('wordnet')
-np.random.seed(42)
-
 def clean_text(text:str, remove_stopword=True) -> str:
   text = text.split()
   new_text = []
@@ -109,6 +109,7 @@ def inference(model_name, vectorize_path="vectorize", root_dir="src/models/exp_1
   submission.to_csv(submission_file_paht, index=False)
     
 if __name__ ==  '__main__':
+  set_seed(config.random_state)
   train_dataset = load_train()
   dataset = preprocessing(train_dataset)
   X_train, y_train, X_test, y_test, feature_name, vectorizer= to_vectors(dataset)
