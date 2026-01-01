@@ -94,43 +94,16 @@ These assumptions were not independently testable in the original setup.
 Treating **BERT + CLS pooling** as a fixed design choice assumes a single vector can summarize long-form, discourse-heavy text. From a research perspective, this hides strong assumptions about how meaning is aggregated across tokens.
 
 ---
-
-### Refined Research Approach
-
-This experiment reframes the problem as a **representation learning study**:
-
-* Encoder produces token-level contextual embeddings
-* Pooling defines what information is preserved
-* Representation becomes the primary experimental variable
-
-Pooling strategies explored:
-
-* CLS pooling
-* Mean pooling
-* Attention-based pooling
-
----
-
-### Research Implications
-
-* Enables controlled comparisons of representations
-* Decouples semantic aggregation from encoder capacity
-* Makes length bias and discourse structure analyzable
-* Shifts AES from fine-tuning to scientific inquiry
-
-> **Shift in focus:**
-> *From “Which model performs best?”*
-> *To “Which representation best captures essay quality?”*
-
----
-
-## 🎯 Overall Summary
-
-* Classical NLP provides strong but limited baselines
-* Transformer models significantly improve performance
-* Representation-centric design enables deeper analysis
-* The project evolves from benchmarking to research
-
+### Result
+Final QWK: 0.7863
+```json
+{'eval_loss': 0.3803684115409851, 
+'eval_qwk': 0.7622537580649085, 
+'eval_runtime': 44.6211, 
+'eval_samples_per_second': 77.587, 
+'eval_steps_per_second': 9.704, 
+'epoch': 5.0}
+```
 ---
 
 ## 🚀 Next Steps
