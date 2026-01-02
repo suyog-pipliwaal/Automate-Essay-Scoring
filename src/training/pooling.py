@@ -19,8 +19,11 @@ class Pooling(nn.Module):
       masked = hidden_state.masked_fill(mask == 0, -1e9)
       return masked.max(dim=1).values
     if self.mode == "attention":
-      score = self.attn(hidden_state).squeeze(-1)
-      score = score.masked_fill(attention_mask==0, -1e9)
-      weights = F.softmax(score, dim=1).unsqueeze(-1)
-      return (hidden_state*weights).sum(dim=1)
+      scores = self.attn(hidden_state).squeeze(-1)
+      min_val = torch.finfo(scores.dtype).min
+      scores = scores.masked_fill(attention_mask == 0, min_val)
+      weights = torch.softmax(scores, dim=1).unsqueeze(-1)
+      pooled = (hidden_state * weights).sum(dim=1)
+      return pooled
+
     raise ValueError(f"unknow pooling mode:{self.mode}")

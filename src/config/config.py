@@ -8,7 +8,7 @@ class SystemConfig(BaseModel):
 
 @dataclass
 class TrainingConfig:
-  exp_name:str = "exp_bert_more_epoch"
+  exp_name:str = "exp_bert_attn_pooling"
   output_dir:str = "src/models"
   
   model_name:str = "bert-base-uncased"
@@ -21,7 +21,7 @@ class TrainingConfig:
   
   learning_rate:float = 2e-5
   weight_decay:float = 0.01
-  num_epoch:int = 9
+  num_epoch:int = 7
   
   train_batch_size:int = 8
   eval_batch_size: int = 8
@@ -32,5 +32,6 @@ class TrainingConfig:
   early_stopping_patience:int = 2
   
   fp16:bool = True
+  pooling:str = "attention"
   
 config = SystemConfig()
