@@ -8,7 +8,7 @@ class SystemConfig(BaseModel):
 
 @dataclass
 class TrainingConfig:
-  exp_name:str = "exp_bert_attn_pooling"
+  exp_name:str = "exp_bert_oridinal_regress"
   output_dir:str = "src/models"
   
   model_name:str = "bert-base-uncased"
