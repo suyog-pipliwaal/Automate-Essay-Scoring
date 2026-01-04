@@ -19,6 +19,12 @@ from rich import box
 
 console = Console()
 
+def to_ordinal_labels(score, num_classes=6):
+    return [int(score > i) for i in range(1, num_classes)]
+
+def add_ordinal_labels(example):
+    example["labels"] = to_ordinal_labels(example["labels"])
+    return example
 def print_banner(exp_name: str, config: TrainingConfig):
     """🚀 Cool animated startup banner"""
     """📱 Compact single-line banner (alternative)"""
@@ -26,7 +32,7 @@ def print_banner(exp_name: str, config: TrainingConfig):
     
     summary = Table.grid(padding=(0, 1), expand=True)
     summary.add_row(f"[bold]Model:[/bold] {config.model_name}")
-    summary.add_row(f"[bold]Output Dir:[/bold] {config.output_dir}")
+    summary.add_row(f"[bold]Output Dir:[/bold] {config.output_dir}/{config.exp_name}")
     
     summary.add_row(f"[bold]Epochs:[/bold] {config.num_epoch}")
     summary.add_row(f"[bold]LR:[/bold] {config.learning_rate:.1e}")
@@ -104,22 +110,22 @@ def build_trainer(model, tokenizer, train_ds, val_ds, TrainingConfig, compute_me
 
 
 def compute_metrics(eval_pred):
-   predict, label = eval_pred
-   predict = predict.squeeze()
-   predict = np.clip(predict,1, 6)
-   qwk = quadratic_weighted_kappa(label, predict)
+   logits, labels = eval_pred
+   probs = 1 / (1 + np.exp(-logits))
+   preds = (probs > 0.5).sum(axis=1) + 1
+   true = labels.sum(axis=1) + 1
+   qwk = quadratic_weighted_kappa(true, preds)
    return {"qwk": qwk}
 
-
 class BertForEssayScoring(torch.nn.Module):
-  def __init__(self, model_name:str, dropout:float, pooling:str):
+  def __init__(self, model_name:str, dropout:float, pooling:str, num_clasess=6):
     super().__init__()
     self.encoder = AutoModel.from_pretrained(model_name)
     hidden = self.encoder.config.hidden_size
     
     self.pooler = Pooling(hidden, pooling)
     self.dropout = torch.nn.Dropout(dropout)
-    self.regressor = torch.nn.Linear(hidden, 1)
+    self.regressor = torch.nn.Linear(hidden, num_clasess-1)
     
 
   def forward(self, input_ids, attention_mask, labels=None):
@@ -131,7 +137,7 @@ class BertForEssayScoring(torch.nn.Module):
       
       loss = None
       if labels is not None:
-        loss = torch.nn.functional.mse_loss(logits, labels.float())
+        loss = torch.nn.BCEWithLogitsLoss()(logits, labels.float())
       return {"loss": loss, "logits": logits}
 
 
@@ -159,6 +165,9 @@ if __name__ == "__main__":
   train_ds = train_ds.rename_column("score", "labels")
   val_ds = val_ds.rename_column("score", "labels")
   
+  
+  train_ds = train_ds.map(add_ordinal_labels)
+  val_ds   = val_ds.map(add_ordinal_labels)
   
   
   train_ds.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
