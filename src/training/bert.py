@@ -7,20 +7,15 @@ from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer, D
 from src.data.load_data import load_train
 from src.utils.kappa import quadratic_weighted_kappa
 from src.utils.plots import plot_training_history
-from src.config.config import config, TrainingConfig
+from src.config.config import TrainingConfig
 from src.utils.seed import set_seed
 from src.data.preprocess import tokenize_dataset
+from src.training.pooling import Pooling
 from datasets import Dataset
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.table import Table
-from rich.live import Live
 from rich.panel import Panel
 from rich import box
-from rich.markdown import Markdown
-import time
-from rich.traceback import install
-
 
 console = Console()
 
@@ -31,7 +26,7 @@ def print_banner(exp_name: str, config: TrainingConfig):
     
     summary = Table.grid(padding=(0, 1), expand=True)
     summary.add_row(f"[bold]Model:[/bold] {config.model_name}")
-    summary.add_row(f"[bold]Output Dir:[/bold] {config.train_batch_size}")
+    summary.add_row(f"[bold]Output Dir:[/bold] {config.output_dir}")
     
     summary.add_row(f"[bold]Epochs:[/bold] {config.num_epoch}")
     summary.add_row(f"[bold]LR:[/bold] {config.learning_rate:.1e}")
@@ -117,17 +112,20 @@ def compute_metrics(eval_pred):
 
 
 class BertForEssayScoring(torch.nn.Module):
-  def __init__(self, model_name:str, dropout:float):
+  def __init__(self, model_name:str, dropout:float, pooling:str):
     super().__init__()
-    self.bert = AutoModel.from_pretrained(model_name)
+    self.encoder = AutoModel.from_pretrained(model_name)
+    hidden = self.encoder.config.hidden_size
+    
+    self.pooler = Pooling(hidden, pooling)
     self.dropout = torch.nn.Dropout(dropout)
-    self.regressor = torch.nn.Linear(self.bert.config.hidden_size, 1)
+    self.regressor = torch.nn.Linear(hidden, 1)
     
 
   def forward(self, input_ids, attention_mask, labels=None):
-      outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+      outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
   
-      pooled = outputs.last_hidden_state.mean(dim=1)
+      pooled =  self.pooler(outputs.last_hidden_state, attention_mask)
       pooled = self.dropout(pooled)
       logits = self.regressor(pooled).squeeze(-1)
       
@@ -166,7 +164,7 @@ if __name__ == "__main__":
   train_ds.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
   val_ds.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
   
-  model = BertForEssayScoring(model_name=train_config.model_name, dropout=train_config.dropout)
+  model = BertForEssayScoring(model_name=train_config.model_name, dropout=train_config.dropout, pooling=train_config.pooling)
  
   trainer = build_trainer(model, tokenizer, train_ds, val_ds, train_config, compute_metrics)
   
