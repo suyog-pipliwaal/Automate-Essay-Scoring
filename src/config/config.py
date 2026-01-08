@@ -8,11 +8,11 @@ class SystemConfig(BaseModel):
 
 @dataclass
 class TrainingConfig:
-  exp_name:str = "exp_bert_oridinal_regress"
+  exp_name:str = "exp_deberta_prompt_head"
   output_dir:str = "src/models"
   
-  model_name:str = "bert-base-uncased"
-  max_length:int = 512
+  model_name:str = "microsoft/deberta-v3-base"
+  max_length:int = 256
   dropout:float = 0.2
   
 
@@ -21,12 +21,12 @@ class TrainingConfig:
   
   learning_rate:float = 2e-5
   weight_decay:float = 0.01
-  num_epoch:int = 7
+  num_epoch:int = 5
   
-  train_batch_size:int = 8
-  eval_batch_size: int = 8
+  train_batch_size:int = 1
+  eval_batch_size: int = 1
   
-  gradient_accumalation_steps:int = 2
+  gradient_accumalation_steps:int = 8
   max_grad_norm:float = 1.0
   
   early_stopping_patience:int = 2
