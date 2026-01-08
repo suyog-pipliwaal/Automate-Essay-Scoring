@@ -18,7 +18,9 @@ dependencies = [
     "torchvision (>=0.24.1,<0.25.0)",
     "transformers[torch] (>=4.57.3,<5.0.0)",
     "rich (>=14.2.0,<15.0.0)",
-    "datasets (>=4.4.2,<5.0.0)"
+    "datasets (>=4.4.2,<5.0.0)",
+    "protobuf (>=6.33.2,<7.0.0)",
+    "sentencepiece (>=0.2.1,<0.3.0)"
 ]
 
 

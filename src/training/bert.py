@@ -16,7 +16,8 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich import box
-
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 console = Console()
 
 def to_ordinal_labels(score, num_classes=6):
@@ -92,7 +93,8 @@ def build_trainer(model, tokenizer, train_ds, val_ds, TrainingConfig, compute_me
       save_safetensors=True,
       fp16=TrainingConfig.fp16,
       logging_steps=50,
-      report_to="none" 
+      report_to="none",
+      remove_unused_columns=False
   )
   
   trainer = Trainer(
@@ -117,28 +119,49 @@ def compute_metrics(eval_pred):
    qwk = quadratic_weighted_kappa(true, preds)
    return {"qwk": qwk}
 
-class BertForEssayScoring(torch.nn.Module):
-  def __init__(self, model_name:str, dropout:float, pooling:str, num_clasess=6):
-    super().__init__()
-    self.encoder = AutoModel.from_pretrained(model_name)
-    hidden = self.encoder.config.hidden_size
-    
-    self.pooler = Pooling(hidden, pooling)
-    self.dropout = torch.nn.Dropout(dropout)
-    self.regressor = torch.nn.Linear(hidden, num_clasess-1)
-    
 
-  def forward(self, input_ids, attention_mask, labels=None):
+class BertForEssayScoring(torch.nn.Module):
+  def __init__(self, model_name:str, dropout:float, pooling:str, num_clasess=6, num_prompts = 8):
+    super().__init__()
+    self.encoder = AutoModel.from_pretrained(model_name)    
+    hidden_size = self.encoder.config.hidden_size
+    
+    self.num_classes = num_clasess
+    self.pooler = Pooling(hidden_size, pooling)
+   
+    
+    self.shared = torch.nn.Sequential(
+        torch.nn.Linear(hidden_size, hidden_size*2), 
+        torch.nn.GLU(),
+        torch.nn.Dropout(dropout)
+      )
+    
+    
+    self.prompt_heads = torch.nn.ModuleDict({
+      str(i):torch.nn.Linear(hidden_size,num_clasess-1) for i in range(1, num_prompts+1)
+    })
+    
+  def forward(self, input_ids, attention_mask, prompt_id, labels=None):
+      
       outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
   
       pooled =  self.pooler(outputs.last_hidden_state, attention_mask)
-      pooled = self.dropout(pooled)
-      logits = self.regressor(pooled).squeeze(-1)
+      shared = self.shared(pooled)
+      logits = torch.zeros(shared.size(0), self.num_classes-1, device=shared.device,  dtype=shared.dtype)
+      
+      for pid in prompt_id.unique():
+          mask = prompt_id == pid
+          logits[mask] = self.prompt_heads[str(pid.item())](shared[mask])
       
       loss = None
       if labels is not None:
-        loss = torch.nn.BCEWithLogitsLoss()(logits, labels.float())
+         loss = self.ordinal_loss(logits, labels.float())
       return {"loss": loss, "logits": logits}
+  
+  def ordinal_loss(self, logits, labels):
+      bce = torch.nn.functional.binary_cross_entropy_with_logits(logits, labels.float())
+      penalty = torch.relu(logits[:, :-1] - logits[:, 1:]).mean()
+      return bce + 0.1 * penalty
 
 
 if __name__ == "__main__":
@@ -165,16 +188,21 @@ if __name__ == "__main__":
   train_ds = train_ds.rename_column("score", "labels")
   val_ds = val_ds.rename_column("score", "labels")
   
+  train_ds = train_ds.add_column("prompt_id", [1] * len(train_ds))
+  val_ds   = val_ds.add_column("prompt_id", [1] * len(val_ds))
   
+
   train_ds = train_ds.map(add_ordinal_labels)
   val_ds   = val_ds.map(add_ordinal_labels)
   
-  
-  train_ds.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
-  val_ds.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
+ 
+  train_ds.set_format("torch", columns=["input_ids", "attention_mask", "labels", "prompt_id"])
+  val_ds.set_format("torch", columns=["input_ids", "attention_mask", "labels", "prompt_id"])
   
   model = BertForEssayScoring(model_name=train_config.model_name, dropout=train_config.dropout, pooling=train_config.pooling)
- 
+  # model.encoder.gradient_checkpointing_enable()
+  # model.encoder.config.use_cache = False
+  
   trainer = build_trainer(model, tokenizer, train_ds, val_ds, train_config, compute_metrics)
   
   console.print(f"Device: {trainer.args.device}")
